@@ -1,0 +1,20 @@
+digraph Kano_Entropy_TOPSIS_Flow {
+	dpi=300 rankdir=LR
+	node [color="#000000" fillcolor="#FFFFFF" fontname="Microsoft YaHei" fontsize=14 margin="0.4,0.2" penwidth=2 shape=rect style="rounded,filled"]
+	edge [arrowsize=0.8 color="#555555" penwidth=1.5]
+	Step1 [label="KANO
+模型分析"]
+	Step2 [label="构造评价指标矩阵：
+Better, Worse, O占比, 
+M占比, A占比"]
+	Step3 [label="熵权法
+计算指标权重"]
+	Step4 [label="TOPSIS 
+欧式距离排序"]
+	Step5 [label="输出
+综合重要度得分"]
+	Step1 -> Step2
+	Step2 -> Step3
+	Step3 -> Step4
+	Step4 -> Step5
+}
