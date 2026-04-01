@@ -16,7 +16,7 @@ from IPython.display import display, HTML
 import html
 from typing import Dict, List, Optional, Union
 
-from pyecharts.globals import CurrentConfig, NotebookType
+from pyecharts.globals import CurrentConfig, NotebookType, ThemeType
 from pyecharts.charts.base import Base
 from pyecharts.charts.chart import Chart
 from pyecharts.datasets import FILENAMES
@@ -25,7 +25,7 @@ from pyecharts.datasets import FILENAMES
 CurrentConfig.NOTEBOOK_TYPE = NotebookType.JUPYTER_NOTEBOOK
 
 
-# ========== CDN 配置（统一使用 jsDelivr GitHub 加速）==========
+# ========== CDN 配置 ==========
 
 # jsDelivr GitHub 加速基础地址（默认）
 JSDELIVR_GH_BASE = "https://cdn.jsdelivr.net/gh/pyecharts/pyecharts-assets@master/assets/"
@@ -43,29 +43,115 @@ CDN_CONFIGS = {
 DEFAULT_CDN = "jsdelivr_gh"
 
 
-# ========== 常用资源快速访问链接 ==========
+# ========== 主题管理器 ==========
 
-RESOURCE_URLS = {
-    # 核心库
-    "echarts": f"{JSDELIVR_GH_BASE}echarts.min",
+class ThemeManager:
+    """主题管理器（支持属性方式设置）"""
+    
+    BUILTIN_THEMES = ["light", "dark", "white"]
+    EXTENSION_THEMES = [
+        "chalk", "essos", "infographic", "macarons", "purple-passion",
+        "roma", "romantic", "shine", "vintage", "walden", "westeros", 
+        "wonderland", "halloween"
+    ]
+    ALL_THEMES = BUILTIN_THEMES + EXTENSION_THEMES
+    
+    def __init__(self):
+        self._theme = "light"
+        self._sync_to_current_config()
+    
+    @property
+    def theme(self) -> str:
+        """获取当前主题"""
+        return self._theme
+    
+    @theme.setter
+    def theme(self, value: str):
+        """
+        设置主题（属性方式）
+        
+        使用: manager.theme = "dark"
+        """
+        theme_str = str(value)
+        if theme_str not in self.ALL_THEMES:
+            raise ValueError(f"不支持的主题: {theme_str}")
+        self._theme = theme_str
+        self._sync_to_current_config()
+    
+    def set_theme(self, theme: str):
+        """
+        设置主题（方法方式）
+        
+        使用: manager.set_theme("dark")
+        """
+        self.theme = theme  # 调用 setter
+    
+    # 便捷属性（类似 ThemeType）
+    @property
+    def light(self): return "light"
+    @property
+    def dark(self): return "dark"
+    @property
+    def white(self): return "white"
+    @property
+    def chalk(self): return "chalk"
+    @property
+    def macarons(self): return "macarons"
+    @property
+    def vintage(self): return "vintage"
+    @property
+    def shine(self): return "shine"
+    @property
+    def wonderland(self): return "wonderland"
+    
+    def _sync_to_current_config(self):
+        """同步到 pyecharts 全局配置"""
+        CurrentConfig.THEME = self._theme
+    
+    def is_builtin(self, theme: str = None) -> bool:
+        """是否为内置主题"""
+        return (theme or self._theme) in self.BUILTIN_THEMES
+    
+    def is_extension(self, theme: str = None) -> bool:
+        """是否为扩展主题"""
+        return (theme or self._theme) in self.EXTENSION_THEMES
 
-    # 扩展插件
-    "echarts-gl": f"{JSDELIVR_GH_BASE}echarts-gl.min",
-    "echarts-wordcloud": f"{JSDELIVR_GH_BASE}echarts-wordcloud.min",
-    "echarts-liquidfill": f"{JSDELIVR_GH_BASE}echarts-liquidfill.min",
-    "echarts-stat": f"{JSDELIVR_GH_BASE}ecStat.min",
 
-    # 地图数据
-    "china": f"{JSDELIVR_GH_BASE}maps/china",
-    "world": f"{JSDELIVR_GH_BASE}maps/world",
-    "china-cities": f"{JSDELIVR_GH_BASE}maps/china-cities",
+# 全局主题管理器实例
+_theme_manager = ThemeManager()
 
-    # 主题
-    "theme-dark": f"{JSDELIVR_GH_BASE}themes/dark",
-    "theme-macarons": f"{JSDELIVR_GH_BASE}themes/macarons",
-    "theme-vintage": f"{JSDELIVR_GH_BASE}themes/vintage",
-    "theme-shine": f"{JSDELIVR_GH_BASE}themes/shine",
-}
+
+# ========== 便捷函数 ==========
+
+def set_theme(theme: str):
+    """
+    设置全局主题
+    
+    Args:
+        theme: 主题名称或 ThemeType 枚举
+    
+    Example:
+        >>> set_theme("dark")
+        >>> set_theme(ThemeType.MACARONS)
+        >>> set_theme(_theme_manager.macarons)
+    """
+    _theme_manager.theme = theme
+
+def get_theme() -> str:
+    """获取当前主题"""
+    return _theme_manager.theme
+
+def get_theme_js_url(theme: str = None) -> Optional[str]:
+    """
+    获取主题 JS 文件 URL
+    
+    Args:
+        theme: 主题名称，默认使用当前设置的主题
+    
+    Returns:
+        主题 JS 文件的 URL，内置主题返回 None
+    """
+    return _theme_manager.get_theme_js_url(theme)
 
 
 # ========== JS 依赖管理器 ==========
@@ -77,7 +163,7 @@ class JSDependencyManager:
     负责分析图表所需的 JS 依赖并生成对应的 CDN URL 和 HTML 标签。
     默认使用 jsDelivr GitHub 加速 CDN。
     """
-
+    
     def __init__(self, cdn_provider: str = DEFAULT_CDN, custom_cdn_base: str = None):
         """
         初始化依赖管理器
@@ -94,7 +180,9 @@ class JSDependencyManager:
             self.provider = cdn_provider
         else:
             raise ValueError(f"不支持的 CDN 提供商: {cdn_provider}")
-
+        
+        self.theme_manager = ThemeManager()
+    
     def get_url(self, dep: str) -> str:
         """
         获取单个依赖的 CDN URL（兼容 pyecharts_jsdelivr_gh.py 的接口）
@@ -106,37 +194,37 @@ class JSDependencyManager:
             完整的 CDN URL
         """
         return self._build_url(dep)
-
-    def get_dependencies(self, chart: Base) -> Dict:
+    def get_dependencies(self, chart: Base, theme: str = None) -> Dict:
         """
-        获取图表所需的 JS 依赖信息
-
-        Returns:
-            {
-                "dependencies": ["echarts", "china", ...],
-                "cdn_urls": ["https://...", ...],
-                "html_tags": "<script...>\n<script...>",
-                "cdn_provider": "jsdelivr_gh",
-                "cdn_base": "https://..."
-            }
+        获取图表所需的 JS 依赖信息（包含主题依赖）
         """
-        # 获取依赖列表（去重）
+        # 获取基础依赖
         deps = list(dict.fromkeys(chart.js_dependencies.items))
 
         # 生成 CDN URL
         urls = [self._build_url(dep) for dep in deps]
-
+        
+        # 处理主题依赖（扩展主题需要加载 JS）
+        current_theme = theme or _theme_manager.get_theme()
+        if self.theme_manager.is_extension_theme(current_theme):
+            theme_url = self.theme_manager.get_theme_js_url(current_theme)
+            if theme_url:
+                urls.append(theme_url)
+                deps.append(f"theme-{current_theme}")
+        
         # 生成 HTML script 标签
         html_tags = "\n".join([f'<script src="{url}"></script>' for url in urls])
-
+        
         return {
             "dependencies": deps,
             "cdn_urls": urls,
             "html_tags": html_tags,
             "cdn_provider": self.provider,
-            "cdn_base": self.cdn_base
+            "cdn_base": self.cdn_base,
+            "theme": current_theme,
+            "theme_is_extension": self.theme_manager.is_extension_theme(current_theme)
         }
-
+    
     def _build_url(self, dep: str) -> str:
         """构建单个依赖的 CDN URL"""
         if dep in FILENAMES:
@@ -361,7 +449,7 @@ def get_chart_dependencies(chart: Base, cdn_provider: str = DEFAULT_CDN) -> Dict
 # ========== 统一导出 ==========
 
 __all__ = [
-    'JSDELIVR_GH_BASE', 'CDN_CONFIGS', 'DEFAULT_CDN', 'RESOURCE_URLS',
+    'JSDELIVR_GH_BASE', 'CDN_CONFIGS', 'DEFAULT_CDN', 'ThemeManager', '_theme_manager', 'set_theme', 'get_theme',
     'JSDependencyManager', 'EChartsRenderer',
     'get_dep_url', 'get_chart_urls', 'chart_cdn_info',
     'create_renderer', 'render_chart', 'display_chart', 'get_chart_dependencies',
