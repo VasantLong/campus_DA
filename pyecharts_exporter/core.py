@@ -16,9 +16,9 @@ CurrentConfig.NOTEBOOK_TYPE = ""
 # ========== 国内加速 CDN 配置 ==========
 CDN_CONFIGS = {
     "pyecharts_official": "https://assets.pyecharts.org/assets/v6/",
-    "jsdelivr_fastly": "https://fastly.jsdelivr.net/gh/pyecharts/pyecharts-assets@master/assets/",
+    "jsdelivr_fastly": "https://fastly.jsdelivr.net/gh/pyecharts/pyecharts-assets@master/assets/v6/",
 }
-DEFAULT_CDN = "jsdelivr_fastly"
+DEFAULT_CDN = "pyecharts_official"
 
 
 # ========== 主题助手 (辅助类) ==========
@@ -131,8 +131,8 @@ class EChartsRenderer:
         return HTML(iframe_html)
 
 # ========== 快速调用入口 ==========
-def display_chart(chart: Base, **kwargs):
-    renderer = EChartsRenderer()
+def display_chart(chart: Base, cdn_provider: str = DEFAULT_CDN, **kwargs):
+    renderer = EChartsRenderer(cdn_provider)
     display(renderer.render(chart, **kwargs))
 
 def get_chart_urls(chart: Base, cdn_provider: str = DEFAULT_CDN, custom_cdn_base: str = None) -> Dict:
